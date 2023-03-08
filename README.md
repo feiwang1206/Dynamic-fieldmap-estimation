@@ -6,4 +6,4 @@ Step 2: Download SphericalHarmonics toolbox from https://github.com/UKLFR-MR/mre
 
 Step 3: Download MIRT toolbox from https://github.com/JeffFessler/mirt to the current folder and unzip it;
 
-Run 'main_script.m';
+Step 4: Run 'main_script.m';
