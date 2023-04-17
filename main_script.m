@@ -5,7 +5,7 @@ if ~exist(pname,'dir')
 end
 
 %% generate 2000 training dataset(reduce the number temperarily for testing)
-training_dataset_generation(1:10,pname);
+recon=training_dataset_generation(1:10,pname);
 
 %% prepare for training
 training_dataset_prepare(pname);
@@ -52,4 +52,31 @@ subplot(1,2,1)
 imagesc(labels(:,:,16,1),[-50 50]);colorbar;
 subplot(1,2,2)
 imagesc(wmap_es(:,:,16,1),[-50 50]);colorbar;
+
+
+
+%%%%%% simulation study
+%% generate kspace rawdata
+pname='test_dataset/';
+if ~exist(pname,'dir')
+    mkdir(pname);
+end
+recon=test_dataset_generation(1,pname);
+field_fake=recon{3};
+field_truth=recon{3}-recon{6};
+%% field map estimation
+load('net/nonorm-3_64_0.5/net_final.mat','net');
+field=fieldmap_estimate(net,recon{7},10,'',[]);
+field_corrected=data.wmap-(imresize3D(data.wmap,size(field{end}{3}))-field{end}{3});
+%% reconstruction 
+
+% with real field map
+recon_truth=recon_reversed(field_truth,pathname,rawdata);
+
+% with fake field map
+recon_static=recon_reversed(field_fake,pathname,rawdata);
+
+% with estimated field map
+recon_corrected=recon_reversed(field_corrected,pathname,rawdata);
+
 
