@@ -1,11 +1,10 @@
-function training_dataset_generation(rang,pname)
+function recon=training_dataset_generation(rang,pname)
     addpath mirt
     setup;
     addpath SphericalHarmonics/coreFunctions
     addpath codes
     addpath(genpath('mreg_recon_tool'));
     scale=[1 1 1]*2;
-    sscale=[1 1 1]*1;
     iter=20;
     if ~exist(pname,'dir')
         mkdir(pname);
@@ -73,7 +72,7 @@ function training_dataset_generation(rang,pname)
 
     for subj=1:length(subject)
         coil_num=16;
-        smaps_l1=imresize4D(smaps,dim.*sscale);
+        smaps_l1=imresize4D(smaps,dim);
         smaps_s1=imresize4D(smaps,dim./scale);
         if gpuDeviceCount
             smaps_l1=gpuArray(smaps_l1);
@@ -119,28 +118,28 @@ function training_dataset_generation(rang,pname)
 
                 T2Star=imresize3D(VObj.T2Star,dim);
 
-                %% rotation
-                tem=(rand(3000,3)-0.5)*2;            
-                rho1=imrotate(rho,180*[tem(n,1)-0.5],'nearest','crop');
-                T1a1=imrotate(T1a,180*[tem(n,1)-0.5],'nearest','crop');
-                T2Star1=imrotate(T2Star,180*[tem(n,1)-0.5],'nearest','crop');
-                bck1=imrotate(bck,180*[tem(n,1)-0.5],'nearest','crop');
-                %% deformation
-                tem=rand([floor([64,64,48]/8),3000,3]);
-                dx = -1+2*tem(:,:,:,n,1);
-                dy = -1+2*tem(:,:,:,n,2);
-                dz = -1+2*tem(:,:,:,n,3);
+                    %% rotation
+                    tem=(rand(3000,3)-0.5)*2;            
+                    rho1=imrotate(rho,180*[tem(n,1)-0.5],'nearest','crop');
+                    T1a1=imrotate(T1a,180*[tem(n,1)-0.5],'nearest','crop');
+                    T2Star1=imrotate(T2Star,180*[tem(n,1)-0.5],'nearest','crop');
+                    bck1=imrotate(bck,180*[tem(n,1)-0.5],'nearest','crop');
+                    %% deformation
+                    tem=rand([floor([64,64,48]/8),3000,3]);
+                    dx = -1+2*tem(:,:,:,n,1);
+                    dy = -1+2*tem(:,:,:,n,2);
+                    dz = -1+2*tem(:,:,:,n,3);
 
-                tem=rand(3000,3);
-                alpha=1;
-                fdx=alpha*imresize3D(dx,dim)*tem(n,1);
-                fdy=alpha*imresize3D(dy,dim)*tem(n,2);
-                fdz=alpha*imresize3D(dz,dim)*tem(n,3);
-                [y x z]=ndgrid(1:dim(1),1:dim(2),1:dim(3));
-                rho1 = griddata(x-fdx,y-fdy,z-fdz,double(rho1),x,y,z);rho1(isnan(rho1))=0;
-                T1a1 = griddata(x-fdx,y-fdy,z-fdz,double(T1a1),x,y,z);T1a1(isnan(T1a1))=0;
-                T2Star1 = griddata(x-fdx,y-fdy,z-fdz,double(T2Star1),x,y,z);T2Star1(isnan(T2Star1))=0;
-                bck1 = griddata(x-fdx,y-fdy,z-fdz,double(bck1),x,y,z);bck1(isnan(bck1))=0;
+                    tem=rand(3000,3);
+                    alpha=1;
+                    fdx=alpha*imresize3D(dx,dim)*tem(n,1);
+                    fdy=alpha*imresize3D(dy,dim)*tem(n,2);
+                    fdz=alpha*imresize3D(dz,dim)*tem(n,3);
+                    [y x z]=ndgrid(1:dim(1),1:dim(2),1:dim(3));
+                    rho1 = griddata(x-fdx,y-fdy,z-fdz,double(rho1),x,y,z);rho1(isnan(rho1))=0;
+                    T1a1 = griddata(x-fdx,y-fdy,z-fdz,double(T1a1),x,y,z);T1a1(isnan(T1a1))=0;
+                    T2Star1 = griddata(x-fdx,y-fdy,z-fdz,double(T2Star1),x,y,z);T2Star1(isnan(T2Star1))=0;
+                    bck1 = griddata(x-fdx,y-fdy,z-fdz,double(bck1),x,y,z);bck1(isnan(bck1))=0;
                 if gpuDeviceCount>0
                     rho1=gpuArray(rho1);
                     T2Star1=gpuArray(T2Star1);
@@ -199,7 +198,7 @@ function training_dataset_generation(rang,pname)
                 map=map/max(abs(map(:)));
                 wmap_err=smooth3(2*(rand-0.5)*100*map.*mask,'box',5);
     %%
-                wmap_real=imresize3D(wmap0,dim.*sscale);
+                wmap_real=imresize3D(wmap0,dim);
                 wmap_fake=imresize3D(wmap0+wmap_err,dim./scale);
                 if gpuDeviceCount
                     wmap_real=gpuArray(wmap_real);
@@ -250,25 +249,18 @@ function training_dataset_generation(rang,pname)
                 Fg2=orc_segm_nuFTOperator_multi_sub({traj2{2}},dim./scale,smaps_s1,wmap_fake,dt,10,{Tt2+te});
 
 
-                [recon{1}] = regularizedReconstruction(Fg1,rawdata{1}, P{:},...
+                [recon{1}] = gather(regularizedReconstruction(Fg1,rawdata{1}, P{:},...
                     'tol',1e-5, ...
                     'maxit',iter, ...
-                    'verbose_flag', 0);
-                [recon{2}] = regularizedReconstruction(Fg2,rawdata{2}, P{:},...
+                    'verbose_flag', 0));
+                [recon{2}] = gather(regularizedReconstruction(Fg2,rawdata{2}, P{:},...
                             'tol',1e-5, ...
                             'maxit',iter, ...
-                            'verbose_flag', 0);
-                recon{1}=single(recon{1});
-                recon{2}=single(recon{2});
-                recon{6}=single(imresize3D(wmap_err,dim./scale));
-                recon{3}=single(wmap_fake);
+                            'verbose_flag', 0));
 
-                if gpuDeviceCount
-                    recon{1}=gather(recon{1});
-                    recon{2}=gather(recon{2});
-                    recon{3}=gather(recon{3});
-                    recon{6}=gather(recon{6});
-                end
+                recon{6}=gather(imresize3D(wmap_err,dim./scale));
+                recon{3}=gather(wmap_fake);
+
                 save(fname,'recon');
             end
         end
